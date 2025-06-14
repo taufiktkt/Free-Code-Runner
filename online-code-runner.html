@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Code Editor Runner</title>
+    <!-- CodeMirror CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css" />
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <!-- JSZip for saving files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- CodeMirror JS and modes -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+    <style>
+    
+    
+    
+    
+    .ast-container, .ast-container-fluid {
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 0px;
+    padding-right: 0px;
+}
+    
+    
+    
+    
+        /* Reset Elementor constraints and allow page scrolling */
+        .code-editor-wrapper {
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box;
+            height: 600px; /* Fixed height for the widget; adjust as needed */
+            display: flex;
+            flex-direction: column;
+            overflow: visible;
+        }
+
+        /* Ensure the container takes full width but allows scrolling */
+        .code-editor-wrapper .container {
+            display: flex;
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+
+        /* Base styles for the editor */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Fira Code', monospace;
+        }
+
+        body {
+            background: #1e1e2e;
+            color: #ffffff;
+            height: 100%;
+        }
+
+        .editor-section {
+            flex: 0 0 40%;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            background: #252535;
+            border-right: 1px solid #3b3b4f;
+        }
+
+        .tabs {
+            display: flex;
+            background: #1e1e2e;
+            border-bottom: 1px solid #3b3b4f;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            background: #252535;
+            color: #a6accd;
+            border-right: 1px solid #3b3b4f;
+            transition: background 0.2s, color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .tab.active {
+            background: #1e1e2e;
+            color: #ffffff;
+            border-bottom: 2px solid #7aa2f7;
+        }
+
+        .tab:hover {
+            background: #2f2f3f;
+        }
+
+        .tab i {
+            font-size: 14px;
+        }
+
+        .editor {
+            flex: 1;
+            position: relative;
+            overflow: auto;
+        }
+
+        .CodeMirror {
+            height: 100% !important;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .editor-controls {
+            padding: 10px;
+            background: #252535;
+            border-top: 1px solid #3b3b4f;
+            display: flex;
+            gap: 10px;
+        }
+
+        .editor-controls button {
+            padding: 8px 16px;
+            background: #3b3b4f;
+            color: #ffffff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .editor-controls button:hover {
+            background: #4b4b5f;
+        }
+
+        .preview-section {
+            flex: 0 0 60%;
+            min-width: 500px;
+            display: flex;
+            flex-direction: column;
+            background: #1e1e2e;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #252535;
+            border-bottom: 1px solid #3b3b4f;
+        }
+
+        .controls select {
+            width: 120px;
+            padding: 8px 10px;
+            background: #3b3b4f;
+            color: #ffffff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .controls select:hover {
+            background: #4b4b5f;
+        }
+
+        .controls .button-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .controls button {
+            padding: 8px 16px;
+            background: #3b3b4f;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+        }
+
+        .controls button:hover {
+            background: #4b4b5f;
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .controls #run {
+            background: #2ecc71;
+            box-shadow: 0 0 5px rgba(46, 204, 113, 0.5);
+        }
+
+        .controls #run:hover {
+            background: #27ae60;
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(46, 204, 113, 0.3);
+        }
+
+        .controls button i {
+            font-size: 14px;
+        }
+
+        .preview {
+            flex: 1;
+            position: relative;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .preview iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #ffffff;
+        }
+
+        .preview.desktop {
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .preview.tablet {
+            width: 768px;
+            margin: 20px auto;
+            border: 8px solid #3b3b4f;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .preview.mobile {
+            width: 375px;
+            margin: 20px auto;
+            border: 8px solid #3b3b4f;
+            border-radius: 24px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .divider {
+            width: 5px;
+            background: #3b3b4f;
+            cursor: ew-resize;
+            transition: background 0.2s;
+        }
+
+        .divider:hover {
+            background: #7aa2f7;
+        }
+
+        @media (max-width: 768px) {
+            .code-editor-wrapper {
+                height: 800px; /* Increase height for mobile to accommodate stacked layout */
+            }
+
+            .code-editor-wrapper .container {
+                flex-direction: column;
+            }
+
+            .editor-section {
+                flex: 0 0 40%; /* 40% height for editor on mobile */
+                max-height: 40%;
+                min-width: 100%;
+                border-right: none;
+                border-bottom: 1px solid #3b3b4f;
+            }
+
+            .preview-section {
+                flex: 0 0 60%; /* 60% height for preview on mobile */
+                max-height: 60%;
+                min-width: 100%;
+            }
+
+            .tabs {
+                overflow-x: auto; /* Allow horizontal scrolling for tabs if they overflow */
+                flex-wrap: nowrap;
+            }
+
+            .tab {
+                padding: 10px 16px; /* Smaller padding for mobile */
+                font-size: 14px;
+            }
+
+            .tab i {
+                font-size: 12px;
+            }
+
+            .editor-controls {
+                padding: 8px;
+                gap: 8px;
+            }
+
+            .editor-controls button {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+
+            .controls {
+                padding: 8px;
+            }
+
+            .controls select {
+                width: 100px;
+                padding: 6px 8px;
+                font-size: 12px;
+            }
+
+            .controls .button-group {
+                gap: 8px;
+            }
+
+            .controls button {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+
+            .controls button i {
+                font-size: 12px;
+            }
+
+            .preview.desktop {
+                width: 100%;
+            }
+
+            .preview.tablet {
+                width: 90%;
+                max-width: 768px;
+            }
+
+            .preview.mobile {
+                width: 90%;
+                max-width: 375px;
+            }
+
+            .divider {
+                height: 5px;
+                width: 100%;
+                cursor: ns-resize;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .code-editor-wrapper {
+                height: 700px; /* Slightly smaller height for very small screens */
+            }
+
+            .editor-section {
+                flex: 0 0 35%; /* Slightly smaller editor height */
+                max-height: 35%;
+            }
+
+            .preview-section {
+                flex: 0 0 65%; /* Slightly larger preview height */
+                max-height: 65%;
+            }
+
+            .tab {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            .tab i {
+                font-size: 10px;
+            }
+
+            .CodeMirror {
+                font-size: 12px;
+            }
+
+            .controls select {
+                width: 90px;
+            }
+
+            .controls button {
+                padding: 6px 10px;
+                font-size: 11px;
+            }
+
+            .controls button i {
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="code-editor-wrapper">
+        <div class="container">
+            <div class="editor-section" role="region" aria-label="Code Editor">
+                <div class="tabs" role="tablist">
+                    <div class="tab active" data-tab="html" role="tab" aria-selected="true" tabindex="0">
+                        <i class="fab fa-html5"></i> HTML
+                    </div>
+                    <div class="tab" data-tab="css" role="tab" aria-selected="false" tabindex="0">
+                        <i class="fab fa-css3-alt"></i> CSS
+                    </div>
+                    <div class="tab" data-tab="js" role="tab" aria-selected="false" tabindex="0">
+                        <i class="fab fa-js"></i> JavaScript
+                    </div>
+                </div>
+                <div class="editor">
+                    <textarea id="html"><h1>Hello, World!</h1>
+<p>Edit the code and see the result!</p></textarea>
+                    <textarea id="css" style="display: none;">h1 {
+    color: #7aa2f7;
+    text-align: center;
+    font-family: Arial, sans-serif;
+}
+p {
+    color: #a6accd;
+    text-align: center;
+}</textarea>
+                    <textarea id="js" style="display: none;">console.log("Hello, World!");
+document.querySelector("p").addEventListener("click", () => {
+    alert("Clicked!");
+});</textarea>
+                </div>
+                <div class="editor-controls">
+                    <button id="clear" aria-label="Clear all code">Clear</button>
+                    <button id="save" aria-label="Save code as ZIP">Save</button>
+                </div>
+            </div>
+            <div class="divider" role="separator" aria-label="Resize editor and preview"></div>
+            <div class="preview-section" role="region" aria-label="Preview">
+                <div class="controls">
+                    <select id="preview-mode" aria-label="Select preview mode">
+                        <option value="desktop">Desktop</option>
+                        <option value="tablet">Tablet</option>
+                        <option value="mobile">Mobile</option>
+                    </select>
+                    <div class="button-group">
+                        <button id="full-view" aria-label="Open full view">
+                            <i class="fas fa-expand"></i> Full View
+                        </button>
+                        <button id="run" aria-label="Run code">
+                            <i class="fas fa-play"></i> Run
+                        </button>
+                    </div>
+                </div>
+                <div class="preview desktop" role="region" aria-label="Preview output">
+                    <iframe id="preview-frame" title="Code output"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize CodeMirror editors
+        const editors = {
+            html: CodeMirror.fromTextArea(document.getElementById('html'), {
+                mode: 'htmlmixed',
+                theme: 'dracula',
+                lineNumbers: true,
+                indentWithTabs: true,
+                tabSize: 2,
+                autoCloseTags: true,
+                matchBrackets: true
+            }),
+            css: CodeMirror.fromTextArea(document.getElementById('css'), {
+                mode: 'css',
+                theme: 'dracula',
+                lineNumbers: true,
+                indentWithTabs: true,
+                tabSize: 2,
+                autoCloseBrackets: true,
+                matchBrackets: true
+            }),
+            js: CodeMirror.fromTextArea(document.getElementById('js'), {
+                mode: 'javascript',
+                theme: 'dracula',
+                lineNumbers: true,
+                indentWithTabs: true,
+                tabSize: 2,
+                autoCloseBrackets: true,
+                matchBrackets: true
+            })
+        };
+
+        // Store editor content
+        let content = {
+            html: editors.html.getValue(),
+            css: editors.css.getValue(),
+            js: editors.js.getValue()
+        };
+
+        // Hide inactive editors
+        editors.css.getWrapperElement().style.display = 'none';
+        editors.js.getWrapperElement().style.display = 'none';
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => {
+                    t.classList.remove('active');
+                    t.setAttribute('aria-selected', 'false');
+                });
+                tab.classList.add('active');
+                tab.setAttribute('aria-selected', 'true');
+
+                Object.keys(editors).forEach(key => {
+                    editors[key].getWrapperElement().style.display = key === tab.dataset.tab ? 'block' : 'none';
+                });
+            });
+
+            tab.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    tab.click();
+                }
+            });
+        });
+
+        // Update preview
+        function updatePreview() {
+            content.html = editors.html.getValue();
+            content.css = editors.css.getValue();
+            content.js = editors.js.getValue();
+
+            const html = content.html;
+            const css = `<style>${content.css}</style>`;
+            const js = `<script>${content.js}<\/script>`;
+            const fullContent = html + css + js;
+
+            const iframe = document.getElementById('preview-frame');
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            doc.open();
+            doc.write(fullContent);
+            doc.close();
+        }
+
+        // Real-time input handling with debounce
+        let debounceTimeout;
+        Object.values(editors).forEach(editor => {
+            editor.on('change', () => {
+                clearTimeout(debounceTimeout);
+                debounceTimeout = setTimeout(updatePreview, 300);
+            });
+        });
+
+        // Run button
+        document.getElementById('run').addEventListener('click', updatePreview);
+
+        // Preview mode
+        document.getElementById('preview-mode').addEventListener('change', (e) => {
+            const preview = document.querySelector('.preview');
+            preview.className = `preview ${e.target.value}`;
+            updatePreview();
+        });
+
+        // Full view
+        document.getElementById('full-view').addEventListener('click', () => {
+            const win = window.open('', '_blank');
+            win.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <style>${content.css}</style>
+                </head>
+                <body>
+                    ${content.html}
+                    <script>${content.js}<\/script>
+                </body>
+                </html>
+            `);
+            win.document.close();
+        });
+
+        // Clear button
+        document.getElementById('clear').addEventListener('click', () => {
+            if (confirm('Clear all code?')) {
+                editors.html.setValue('');
+                editors.css.setValue('');
+                editors.js.setValue('');
+                updatePreview();
+            }
+        });
+
+        // Save button
+        document.getElementById('save').addEventListener('click', () => {
+            const zip = new JSZip();
+            zip.file('index.html', content.html);
+            zip.file('styles.css', content.css);
+            zip.file('script.js', content.js);
+            zip.generateAsync({ type: 'blob' }).then(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'code.zip';
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        });
+
+        // Resizable divider
+        const divider = document.querySelector('.divider');
+        let isDragging = false;
+
+        divider.addEventListener('mousedown', () => {
+            isDragging = true;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const container = document.querySelector('.container');
+            const containerWidth = container.getBoundingClientRect().width;
+            const containerHeight = container.getBoundingClientRect().height;
+            if (window.innerWidth > 768) {
+                const editorSection = document.querySelector('.editor-section');
+                const width = (e.clientX / containerWidth) * 100;
+                editorSection.style.flex = `0 0 ${Math.max(30, Math.min(70, width))}%`;
+            } else {
+                const editorSection = document.querySelector('.editor-section');
+                const height = (e.clientY / containerHeight) * 100;
+                editorSection.style.flex = `0 0 ${Math.max(30, Math.min(70, height))}%`;
+                editorSection.style.maxHeight = `${Math.max(30, Math.min(70, height))}vh`;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        // Initial render
+        updatePreview();
+    </script>
+</body>
+</html>
